@@ -1,6 +1,6 @@
 #!/bin/bash
-#PBS -l nodes=1:ppn=32
-#PBS -l mem=20g
+#PBS -l nodes=1:ppn=48
+#PBS -l mem=200g
 #PBS -l walltime=96:00:00
 #PBS -N gcn
 #PBS -q cgsd
@@ -52,7 +52,7 @@ cut -f2 tmp/"$pat"_nko |cut -d '|' -f 2 > tmp/"$pat"_tmpB
 eval "pr -mt -s, tmp/"$pat"_tmpB tmp/"$pat"_tmpA >run/gcn/pat/"$pat"_nk"
 rm tmp/*tmp*
 
-python run/gcn/gcn.py $pat
+# python run/gcn/gcn.py $pat
 
 }
 
@@ -60,7 +60,7 @@ export -f dia2nk
 
 # parallel dia2nk ::: run/gcn/pat/*_proteins_o2
 
-
+########################################################################
 function cnvt {
 
 patt=$1
@@ -72,12 +72,28 @@ export -f cnvt
 
 # parallel cnvt ::: run/gcn/pat/*_nk
 
+########################################################################
 function humann3X {
-
+pat=$1
 humann --threads 40 --input-format fasta --input $pat --output humann3 --nucleotide-database /groups/cgsd/gordonq/database/humann_chocophlan/ --protein-database /groups/cgsd/gordonq/database/uniref90/ --remove-temp-output --metaphlan-options "--bowtie2db /home/dcmorgan/.conda/envs/mypy3/lib/python3.9/site-packages/metaphlan/metaphlan_databases/"
+# https://github.com/biobakery/biobakery/wiki/humann3#22-running-humann-the-basics
 }
+
 export -f humann3X
 # parallel humann3X ::: /groups/cgsd/gordonq/LauG_Metagenomics_CPOS-200710-CJX-3455a/primary_seq/merged/*.fasta
 
 
-python run/gcn/gcn.py $pat
+patdir='/groups/cgsd/gordonq/LauG_Metagenomics_CPOS-200710-CJX-3455a/primary_seq/merged/*.fasta'
+pats=$(ls $patdir)
+
+# for pat in $pats
+# do
+# humann3X $pat
+# done
+# humann_join_tables -i /groups/cgsd/gordonq/all_hypertension/humann3_res/ -o ~/ht_subset_genefamilies.tsv --file_name genefamilies
+
+# humann_renorm_table -i ~/ht_subset_genefamilies.tsv -o ~/ht_genefamilies-cpm.tsv --units cpm
+
+
+########################################################################
+python run/gcn/gcn.py
