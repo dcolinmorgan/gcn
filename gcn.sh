@@ -92,7 +92,7 @@ pats=$(ls $patdir)
 # done
 # humann_join_tables -i /groups/cgsd/gordonq/all_hypertension/humann3_res/ -o ~/ht_subset_genefamilies.tsv --file_name genefamilies
 
-# humann_renorm_table -i ~/ht_subset_genefamilies.tsv -o ~/ht_genefamilies-cpm.tsv --units cpm
+# humann_renorm_table -i ~/ht_subset_genefamilies.tsv -o ~/data/gcn/ht_genefamilies-cpm.tsv --units cpm
 
 
 ########################################################################

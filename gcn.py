@@ -14,7 +14,7 @@ from gcn_func import bip, load_list_of_dicts, meas, plotRidge
 patt='all'
 
 if patt=='all':
-    relgene=pd.read_csv('~/ht_genefamilies-cpm.tsv',sep='\t')
+    relgene=pd.read_csv('~/data/gcn/ht_genefamilies-cpm.tsv',sep='\t')
 # elif patt=='other':
 #     relgene=pd.read_csv('~/ht_subset_genefamilies-cpm.tsv',sep='\t')
 elif patt=='50': ##humann2, others are humann3
@@ -77,22 +77,26 @@ if not os.path.isfile('data/gcn/BX_'+patt+'_hypert.pkl'):
 graphs = load_list_of_dicts('data/gcn/BX_'+patt+'_hypert.pkl')
 # relgene=pd.read_csv('data/gcn/relgene'+patt+'.txt',sep='\t',nrows=1)
 
-measur='nx.betweenness_centrality'
-df=meas(measur,uni_bact,relgene,graphs)
-plotRidge(df,'NoHT',measur,patt)
-plotRidge(df,'HT',measur,patt)
+# def plott(measur,uni_bact,relgene,graphs):
+    # measur='nx.betweenness_centrality'
+# df=meas(measur,uni_bact,relgene,graphs)
+# plotVio(df,'NoHT',measur,patt)
+dd=[['nx.harmonic_centrality','nx.communicability','nx.betweenness_centrality','nx.degree_centrality','nx.closeness_centrality','nx.node_redundancy']]
+df=Parallel(n_jobs=7) (meas(measur,uni_bact,relgene,graphs,patt) for measur in dd)
+# C=[tup[1] for tup in ff]
+df=[tup[0] for tup in df]
+    
+# measur='nx.degree_centrality'
+# df=meas(measur,uni_bact,relgene,graphs)
+# plotVio(df,'NoHT',measur,patt)
+# plotVio(df,'HT',measur,patt)
 
-measur='nx.degree_centrality'
-df=meas(measur,uni_bact,relgene,graphs)
-plotRidge(df,'NoHT',measur,patt)
-plotRidge(df,'HT',measur,patt)
+# measur='nx.closeness_centrality'
+# df=meas(measur,uni_bact,relgene,graphs)
+# plotVio(df,'NoHT',measur,patt)
+# plotVio(df,'HT',measur,patt)
 
-measur='nx.closeness_centrality'
-df=meas(measur,uni_bact,relgene,graphs)
-plotRidge(df,'NoHT',measur,patt)
-plotRidge(df,'HT',measur,patt)
-
-measur='nx.node_redundancy'
-df=meas(measur,uni_bact,relgene,graphs)
-plotRidge(df,'NoHT',measur,patt)
-plotRidge(df,'HT',measur,patt)
+# measur='nx.node_redundancy'
+# df=meas(measur,uni_bact,relgene,graphs)
+# plotVio(df,'NoHT',measur,patt)
+# plotVio(df,'HT',measur,patt)

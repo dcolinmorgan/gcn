@@ -48,20 +48,28 @@ def load_list_of_dicts(filename, create_using=nx.Graph):
     return graphs
 
 
-def meas(measur,uni_bact,relgene,graphs):
+# @delayed
+# @wrap_non_picklable_objects
+def meas(measur,uni_bact,relgene,graphs,patt):
     HTXX=uni_bact[uni_bact.index.isin(relgene.columns[1:-2].str.split('-').str[0])]
     HTXX['index']=np.arange(len(HTXX))
-    measur=eval(measur)
-    S = [measur(graphs[i]) for i in HTXX[HTXX['HT']==0]['index'].values]
-    T = [measur(graphs[i]) for i in HTXX[HTXX['HT']!=0]['index'].values]
-
-    non=pd.DataFrame(S).melt()
+    # measur=eval(measur)
+    S = [eval(measur)(graphs[i]) for i in HTXX[HTXX['HT']==0]['index'].values]
+    T = [eval(measur)(graphs[i]) for i in HTXX[HTXX['HT']!=0]['index'].values]
+    
+    if measur!='nx.degree':
+        non=pd.DataFrame(S).melt()
+        yes=pd.DataFrame(T).melt()
+    elif measur=='nx.degree':
+        non=pd.DataFrame(S.pop())
+        non=non.rename(columns={0:'variable',1:'value'})
+        yes=pd.DataFrame(T.pop())
+        yes=yes.rename(columns={0:'variable',1:'value'})
     non['type']='NoHT'
     non.dropna(inplace=True)
     non=non[non.value!=0]
     non=non[~non['variable'].str.contains('UniRef90')]
     non.value=non.value/np.sum(non.value)
-    yes=pd.DataFrame(T).melt()
     yes['type']='HT'
     yes.dropna(inplace=True)
     yes=yes[yes.value!=0]
@@ -70,6 +78,16 @@ def meas(measur,uni_bact,relgene,graphs):
     df=non.append(yes)
     # df=df.dropna()
     df['gen']=df.variable.str.split('_').str[2]
+    df.to_csv("data/gcn/"+patt+"_"+str(measur)+"_.txt",sep='\t')
+
+    plt.figure(figsize=(10,30))
+    sns.set_theme(style="whitegrid")
+
+    sns.violinplot(data=df, y="gen", x="value",hue="type",
+                   split=True, inner="quart", linewidth=1,
+                   orient="h")
+    sns.despine(left=True)
+    plt.savefig("data/gcn/"+patt+"_"+str(measur)+"_violin.png",dpi=300,bbox_inches = "tight")
     return df
 
 def plotRidge(df,typ,measur,patt):
@@ -117,5 +135,5 @@ def plotRidge(df,typ,measur,patt):
     g.set_titles("")
     g.set(yticks=[], ylabel="")
     g.despine(bottom=True, left=True)
-    plt.savefig("data/gcn/"+patt+"_"+measur+"_"+typ+".png",dpi=300,bbox_inches = "tight")
+    plt.savefig("data/gcn/"+patt+"_"+str(measur)+".png",dpi=300,bbox_inches = "tight")
 
