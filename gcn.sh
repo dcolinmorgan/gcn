@@ -17,7 +17,7 @@ source activate mypy3
 # export JOBS_PER_NODE=1
 
 chmod +x run/gcn/gcn.py
-
+chmod +x run/gcn/gcn_plot.py
 #################PRODIGAL in parallel##############
 function gcnXpat {
 patt=$1
@@ -96,4 +96,6 @@ pats=$(ls $patdir)
 
 
 ########################################################################
-python run/gcn/gcn.py
+# python run/gcn/gcn.py
+# 
+python run/gcn/gcn_plot.py

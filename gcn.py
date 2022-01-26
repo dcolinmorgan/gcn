@@ -65,14 +65,17 @@ dd=relgene.columns[relgene.columns.str.contains('RPKs')]
     # ff,C=bip(cc,net,ff,C,patt)
 
 # cc.columns.str.contain()
-if not os.path.isfile('data/gcn/BX_'+patt+'_hypert.pkl'):
+if not os.path.isfile('data/gcn/fBX_'+patt+'_HT.pkl'):
     ff=Parallel(n_jobs=48) (bip(cc,net,ff,C,patt) for i,net in enumerate(dd))
     C=[tup[1] for tup in ff]
     ff=[tup[0] for tup in ff]
-    with open('data/gcn/NX_'+str(patt)+'_hypert.pkl', 'ab+') as f:
+    # xx=[tup[2] for tup in ff]
+    with open('data/gcn/NX_'+str(patt)+'_HT.pkl', 'ab+') as f:
         pickle.dump(ff, f)
-    with open('data/gcn/BX_'+str(patt)+'_hypert.pkl', 'ab+') as f:
+    with open('data/gcn/BX_'+str(patt)+'_HT.pkl', 'ab+') as f:
         pickle.dump(C, f)
+    # with open('data/gcn/fBX_'+str(patt)+'_HT.pkl', 'ab+') as f:
+    #     pickle.dump(xx, f)
 
 graphs = load_list_of_dicts('data/gcn/BX_'+patt+'_hypert.pkl')
 # relgene=pd.read_csv('data/gcn/relgene'+patt+'.txt',sep='\t',nrows=1)
@@ -81,7 +84,9 @@ graphs = load_list_of_dicts('data/gcn/BX_'+patt+'_hypert.pkl')
     # measur='nx.betweenness_centrality'
 # df=meas(measur,uni_bact,relgene,graphs)
 # plotVio(df,'NoHT',measur,patt)
-dd=[['nx.harmonic_centrality','nx.communicability','nx.betweenness_centrality','nx.degree_centrality','nx.closeness_centrality','nx.node_redundancy']]
+dd=[#'nx.harmonic_centrality',
+    # 'nx.communicability',
+    'nx.betweenness_centrality','nx.degree_centrality','nx.degree','nx.closeness_centrality','nx.node_redundancy']
 df=Parallel(n_jobs=7) (meas(measur,uni_bact,relgene,graphs,patt) for measur in dd)
 # C=[tup[1] for tup in ff]
 df=[tup[0] for tup in df]
