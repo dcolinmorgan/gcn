@@ -18,7 +18,6 @@ source activate mypy3
 
 chmod +x run/gcn/gcn.py
 chmod +x run/gcn/gcn_plot.py
-chmod +x run/gcn/gcn_func.py
 #################PRODIGAL in parallel##############
 function gcnXpat {
 patt=$1
@@ -100,4 +99,3 @@ pats=$(ls $patdir)
 # python run/gcn/gcn.py
 # 
 python run/gcn/gcn_plot.py
-build_gcn('arg_subset_genefamilies-cpm.tsv','ARG')

@@ -314,12 +314,15 @@ def build_gcn(path,name):
     relgene['spec'].replace('_',' ')
     relgene.index=relgene.index.str.split('|').str[0]
     relgene=relgene.dropna()
+    cc=relgene.groupby(['# Gene Family','spec']).sum()
+    cc=cc.reset_index()
+    cc=cc.rename(columns={'# Gene Family':'gene'})
 
 
     ff=[]
     C=[]
     for i,net in enumerate(relgene.columns[1:-2]):
-        pd.read_csv()
+        # pd.read_csv()
         dd=cc[['spec','gene',net]]
         dd=dd[dd[net]!=0]
         ee=nx.from_pandas_edgelist(dd,source='spec',target='gene')
