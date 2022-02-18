@@ -57,14 +57,15 @@ dd.set_index(['source', 'target'], inplace=True) #>> run only first time editing
 
 noHT=dd.filter(regex='_0_').dropna(how='all')
 noHT=proc_dat(noHT)
-rev_tbar(noHT,10,'noHT')
+rev_tbar(noHT,10,'noHTE')
 
 HT1=dd.filter(regex='_1_').dropna(how='all')
-HT1=proc_dat(HT1)
-rev_tbar(HT1,10,'HT1')
-
 HT2=dd.filter(regex='_2_').dropna(how='all')
-HT2=proc_dat(HT2)
-rev_tbar(HT2,10,'HT2')
+HT=HT1.merge(HT2,right_index=True,left_index=True).dropna(how='all')
+HT=proc_dat(HT)
+rev_tbar(HT,10,'HTE')
+
+
+# rev_tbar(HT2,10,'HT2')
     
 # Parallel(n_jobs=3) (rev_tbar(data,10) for data in ([noHT,HT1,HT2]))
