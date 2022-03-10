@@ -1,8 +1,8 @@
 #!/bin/bash
-#PBS -l nodes=1:ppn=48
-#PBS -l mem=200g
-#PBS -l walltime=96:00:00
-#PBS -N gcn
+#PBS -l nodes=1:ppn=28
+#PBS -l mem=50g
+#PBS -l walltime=01:00:00
+#PBS -N gcn3
 #PBS -q cgsd
 #PBS -e .GCerr
 #PBS -o .GCout
@@ -18,6 +18,7 @@ source activate mypy3
 
 chmod +x run/gcn/gcn.py
 chmod +x run/gcn/gcn_plot.py
+chmod +x run/gcn/build_gcn.py
 #################PRODIGAL in parallel##############
 function gcnXpat {
 patt=$1
@@ -98,4 +99,25 @@ pats=$(ls $patdir)
 ########################################################################
 # python run/gcn/gcn.py
 # 
-python run/gcn/gcn_plot.py
+# python run/gcn/gcn_plot.py
+
+
+# python nestedness_analysis/structural_analysis.py nest/$folder/ True True False 0 &
+# python nestedness_analysis/structural_analysis.py nest/$folder/ True True True .2 &
+# python nestedness_analysis/structural_analysis.py nest/$folder/ True True True .99
+
+
+function buildd {
+pat=$1
+python run/gcn/build_gcn.py $group False 0 &
+python run/gcn/build_gcn.py $group True .2 &
+python run/gcn/build_gcn.py $group True .99
+# done
+echo $folder
+}
+
+export -f buildd
+# parallel -j 3 buildd  ::: $(seq 1 10 130)
+
+
+# python run/gcn/nested_analysis.py

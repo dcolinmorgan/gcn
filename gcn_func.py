@@ -9,11 +9,17 @@ import seaborn as sns
 from joblib import delayed, wrap_non_picklable_objects
 from pathlib import Path
 import plotly
+from joblib import Parallel
 import sklearn.utils as sku
 import plotly.graph_objects as go
 import plotly.express as px
 # j=sys.argv[1]
 
+sys.path.insert(1, './nestedness_modularity_in-block_nestedness_analysis-master/')
+import nestedness_metrics_other_functions
+from nestedness_metrics_other_functions import from_edges_to_matrix
+# importlib.reload(sys.modules['EO_functions_bipartite'])
+import extremal_bi
 
 @delayed
 @wrap_non_picklable_objects
@@ -273,7 +279,7 @@ def time_order_net(control,case,thresh=10**-6,group='source',groups=6,rounder=1,
         cc='BB['+str(i)+'])&(BB['+str(i)+']>='
         aa=aa+str(cc)
         dd='BB['+str(i)+'])&(BB['+str(i)+']<='
-        bb=bb+str(cc)
+        bb=bb+str(dd)
         
     grow=BB[eval(bb[:-9])]
     die=BB[eval(aa[:-9])]
@@ -290,65 +296,159 @@ def time_order_net(control,case,thresh=10**-6,group='source',groups=6,rounder=1,
         return BBgrow
     BBgrow=proc_run(grow,'grow')
     BBdie=proc_run(die,'die')
-    return BBgrow,BBdie
+    return BBgrow,BBdie,noHTm,HTm
 
 
     
     
-def build_gcn(path,name):
+def build_gcn(i,net,cc,min_deg=5):
 
-    relgene=pd.read_csv(path,sep='\t')
-    # relgene=pd.read_csv('50_genefamilies-cpm.tsv')
-    # relgene=pd.read_csv('hmp_subset_genefamilies-cpm.tsv',sep='\t',nrows=100)
+#     relgene=pd.read_csv(path,sep='\t')
+#     # relgene=pd.read_csv('50_genefamilies-cpm.tsv')
+#     # relgene=pd.read_csv('hmp_subset_genefamilies-cpm.tsv',sep='\t',nrows=100)
 
-    relgene['gene']=relgene['# Gene Family'].str.split('|').str[0]
-    relgene=relgene[relgene['gene']!='UniRef90_unknown']
-    relgene=relgene[relgene['gene']!='UNMAPPED']
-    relgene.index=relgene['# Gene Family']
-    del relgene['gene'], relgene['# Gene Family']
-    # relgene=relgene/relgene.sum(axis=0)
+#     relgene['gene']=relgene['# Gene Family'].str.split('|').str[0]
+#     relgene=relgene[relgene['gene']!='UniRef90_unknown']
+#     relgene=relgene[relgene['gene']!='UNMAPPED']
+#     relgene.index=relgene['# Gene Family']
+#     del relgene['gene'], relgene['# Gene Family']
+#     # relgene=relgene/relgene.sum(axis=0)
 
-    # relgene=relgene/relgene.sum(axis=0)
-    relgene['gen']=relgene.index.str.split('|').str[1].str.split('.').str[0].tolist()
-    relgene['spec']=relgene.index.str.split('.').str[1]#.str.split('.').str[0].tolist()
-    relgene['spec'].replace('_',' ')
-    relgene.index=relgene.index.str.split('|').str[0]
-    relgene=relgene.dropna()
-    cc=relgene.groupby(['# Gene Family','spec']).sum()
-    cc=cc.reset_index()
-    cc=cc.rename(columns={'# Gene Family':'gene'})
+#     # relgene=relgene/relgene.sum(axis=0)
+#     relgene['gen']=relgene.index.str.split('|').str[1].str.split('.').str[0].tolist()
+#     relgene['spec']=relgene.index.str.split('.').str[1]#.str.split('.').str[0].tolist()
+#     relgene['spec'].replace('_',' ')
+#     relgene.index=relgene.index.str.split('|').str[0]
+#     relgene=relgene.dropna()
+#     cc=relgene.groupby(['# Gene Family','spec']).sum()
+#     cc=cc.reset_index()
+#     cc=cc.rename(columns={'# Gene Family':'gene'})
 
-
-    ff=[]
-    C=[]
-    for i,net in enumerate(relgene.columns[1:-2]):
+#     ff=[]
+#     C=[]
+    # for i,net in enumerate(relgene.columns[1:-2]):
         # pd.read_csv()
-        dd=cc[['spec','gene',net]]
-        dd=dd[dd[net]!=0]
-        ee=nx.from_pandas_edgelist(dd,source='spec',target='gene')
-        remove = [node for node,degree in dict(ee.degree()).items() if degree <10]
-        ee.remove_nodes_from(remove)
-        ff.append(ee)
+    dd=cc[['spec','gene',net]]
+    dd=dd[dd[net]!=0]
+    ee=nx.from_pandas_edgelist(dd,source='spec',target='gene',edge_attr=net)
+    remove = [node for node,degree in dict(ee.degree()).items() if degree <min_deg]
+    ee.remove_nodes_from(remove)
+    # ff.append(ee)
 
-        B = nx.Graph()
-        B.add_nodes_from(dd['spec'], bipartite=0)
-        B.add_nodes_from(dd['gene'], bipartite=1)
-        B.add_edges_from(tuple(dd[['spec','gene']].itertuples(index=False, name=None)))
-        remove = [node for node,degree in dict(B.degree()).items() if degree <10]
-        B.remove_nodes_from(remove)
-        C.append(B)
+    B = nx.Graph()
+    B.add_nodes_from(dd['spec'], bipartite=0)
+    B.add_nodes_from(dd['gene'], bipartite=1)
+    B.add_edges_from(tuple(dd[['spec','gene']].itertuples(index=False, name=None)))
+    remove = [node for node,degree in dict(B.degree()).items() if degree <min_deg]
+    B.remove_nodes_from(remove)
+    # C.append(B)
+    return ee,B
 
-    with open('data/gcn/NX_all_'+name+'.pkl', 'wb') as f:
-        pickle.dump(ff, f)
-    with open('data/gcn/BX_all_'+name+'.pkl', 'wb') as f:
-        pickle.dump(C, f)
+    # with open('data/gcn/NX_Emore_'+name+'.pkl', 'wb') as f:
+    #     pickle.dump(ff, f)
+    # with open('data/gcn/BX_Emore_'+name+'.pkl', 'wb') as f:
+    #     pickle.dump(C, f)
     
+
+def buildSYNCSA(dd): 
+    names=pd.unique(dd.columns.str.split('_').str[1]+'_'+dd.columns.str.split('_').str[2])[1:]
+    for i in names:
+        # ff.columns = ff.columns.str.strip('_x')
+        # ff.columns = ff.columns.str.strip('_y')
+        # i=i.split('_')[1]+'_'+i.split('_')[2]
+        ff=dd.loc[:,dd.columns.str.contains(i)]
+        ff[['source','target']]=dd[['source','target']]
+        ff=ff[ff['source'].str.contains('s__')]
+        ff=ff[ff['target'].str.contains('UniRef')]
+        ff.groupby('source').sum().transpose().to_csv('comm_'+i+'.csv')
+        ff.reset_index(inplace=True)
+        ff.set_index(['source', 'target'], inplace=True)
+        del ff['index']
+        ff.columns=(ff.columns.str.split('_').str[1]+'_'+ff.columns.str.split('_').str[2])
+        gg=ff.groupby(by=ff.columns, axis=1).sum()
+        traits=gg[[i]].reset_index().pivot('source','target',i).dropna(how='all',axis=1).replace(np.nan,0)
+        traits.to_csv('trait_'+i+'.csv')
     
+
+def buildNestedNess():
+    C=pd.DataFrame(columns=['N','Q','I','type'f])
+    D=[]
+    files=glob.glob('*.npz')
+    for i,j in enumerate(files):
+        d=np.load(j)
+        C.loc[i]=[float(d['N']),float(d['Q']),float(d['I']),j.split('_')[1]+'_'+j.split('_')[2]+'_'+j.split('_')[3].split('.')[0]]
+        
+def structural_analysis(ii,i,graphs,ARG_meta,rand,deg_rand):
+    # aa= rrr[['from','to','value']].values
+    ccc=nx.convert_matrix.to_pandas_edgelist(graphs[ii])
+    ee=nx.convert_matrix.to_pandas_edgelist(graphs[ii])
+    # cc['weight']=np.random.randn(len(cc))
+    pww=i
+    j=(i.split('-')[1])
+    i=(i.split('-')[0])
+    rrr=str(ARG_meta[ARG_meta['id']==i].index.item())+'_'+str(ARG_meta[ARG_meta['id']==i]['group'].item())+'_'+str(j)
+    ccc.rename(columns={ccc.columns[2]:rrr},inplace=True)
     
+    a,b=pd.factorize(ccc['source']) 
+    c,d=pd.factorize(ccc['target'])
+    rrr=pd.DataFrame()
+    rrr['from']=a
+    rrr['to']=c
+    rrr['value']=1
+    sss=str(ARG_meta[ARG_meta['id']==i]['group'].item())+'_'+str(j)
+    Path('nest/'+sss).mkdir(parents=True, exist_ok=True)
+    # rrr[['from','to','value']].to_csv('~/nest/'+sss+'/'+str(ccc.columns[2])+'.csv',sep=' ',index=False,header=False)
+    aa= rrr[['from','to','value']].values
     
+    if rand==True: ## to randomize
+        aa=pd.DataFrame(aa)
+        ddd=aa.sample(frac=np.float(deg_rand), replace=False, random_state=1) ##degree randomized
+        rrr=aa[~aa.isin(ddd)].dropna(how='all')
+        ddd.reset_index(inplace=True)
+        del ddd['index']
+        sss=shuffle(ddd)
+        aa=pd.concat([rrr,sss])
+        aa=np.array(aa).astype(int)
+    
+    nodes_cols = int(max(aa[j,1] for j in range(aa.shape[0]))+1)
+    nodes_rows= int(max(aa[j,0] for j in range(aa.shape[0]))+1)
+    matrix=np.zeros((nodes_rows,nodes_cols),dtype='int')
+    for j in range(aa.shape[0]):
+        matrix[aa[j,0],aa[j,1]] = 1
+    M=matrix
+
+    cols_degr=M.sum(axis=0)
+    row_degr=M.sum(axis=1)
+    R,C=M.shape #rows and cols
+    #Nestednes
+    # In-block nestedness with B=1
+    Cn_=[np.repeat(1, R),np.repeat(1, C)]
+    max_blockN=max(max(Cn_[0]),max(Cn_[1]))+1
+    lambdasN=extremal_bi.call_lambda_i(M,cols_degr,row_degr,Cn_[1],Cn_[0],max_blockN,True)
+    N=extremal_bi.calculate_Fitness(M,cols_degr,row_degr,lambdasN[0],lambdasN[1],True)
+
+    #Modularity Extremal
+    C_=extremal_bi.recursive_step(M,cols_degr,row_degr,.7,3,False)
+    max_blockQ=max(max(C_[0]),max(C_[1]))+1
+    lambdasQ=extremal_bi.call_lambda_i(M,cols_degr,row_degr,C_[1],C_[0],max_blockQ,False)
+    Q=extremal_bi.calculate_Fitness(M,cols_degr,row_degr,lambdasQ[0],lambdasQ[1],False)
+
+    # Inblock nestedness extremal
+    Ci_=extremal_bi.recursive_step(M,cols_degr,row_degr,.7,3,True)
+    max_blockI=max(max(Ci_[0]),max(Ci_[1]))+1
+    lambdasI=extremal_bi.call_lambda_i(M,cols_degr,row_degr,Ci_[1],Ci_[0],max_blockI,True)
+    I=extremal_bi.calculate_Fitness(M,cols_degr,row_degr,lambdasI[0],lambdasI[1],True)
+    zzz=[str(N),str(Q),str(I),sss]
+    print(zzz)
+    # np.savetxt('ARG_nest_test.txt', zzz, delimiter = '\t', fmt='%s')
+    with open("randB_ARG_nest.txt", "ab") as f:
+        np.savetxt(f,np.column_stack([str(N),str(Q),str(I),sss,pww]),delimiter = '\t', fmt='%s')
+    return N,Q,I,sss,pww
+
+
+
 ####################TRASH FOLLOWS#########################
-    
-    
+   
 
 
 def plotRidge(df,typ,measur,patt):

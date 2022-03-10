@@ -9,7 +9,7 @@ import networkx as nx
 # import networkit as nk
 from networkx.algorithms import bipartite
 from joblib import Parallel
-from gcn_func import bip, load_list_of_dicts, meas, plotRidge
+from gcn_func import bip, load_list_of_dicts, meas, plotRidge,structural_analysis
 
 patt='all'
 
@@ -87,7 +87,7 @@ graphs = load_list_of_dicts('data/gcn/BX_'+patt+'_hypert.pkl')
 dd=[#'nx.harmonic_centrality',
     # 'nx.communicability',
     'nx.betweenness_centrality','nx.degree_centrality','nx.degree','nx.closeness_centrality','nx.node_redundancy']
-df=Parallel(n_jobs=7) (meas(measur,uni_bact,relgene,graphs,patt) for measur in dd)
+# df=Parallel(n_jobs=7) (meas(measur,uni_bact,relgene,graphs,patt) for measur in dd)
 # C=[tup[1] for tup in ff]
 df=[tup[0] for tup in df]
     
