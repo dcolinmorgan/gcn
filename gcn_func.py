@@ -9,13 +9,16 @@ import seaborn as sns
 from joblib import delayed, wrap_non_picklable_objects
 from pathlib import Path
 import plotly
+from numba import jit
 from joblib import Parallel
 import sklearn.utils as sku
 import plotly.graph_objects as go
 import plotly.express as px
 # j=sys.argv[1]
-
-sys.path.insert(1, './nestedness_modularity_in-block_nestedness_analysis-master/')
+from urllib import request
+import xml.etree.ElementTree as ET
+import urllib
+sys.path.insert(1, './nestedness_analysis/')
 import nestedness_metrics_other_functions
 from nestedness_metrics_other_functions import from_edges_to_matrix
 # importlib.reload(sys.modules['EO_functions_bipartite'])
@@ -371,7 +374,7 @@ def buildSYNCSA(dd):
     
 
 def buildNestedNess():
-    C=pd.DataFrame(columns=['N','Q','I','type'f])
+    C=pd.DataFrame(columns=['N','Q','I','type'])
     D=[]
     files=glob.glob('*.npz')
     for i,j in enumerate(files):
@@ -446,339 +449,300 @@ def structural_analysis(ii,i,graphs,ARG_meta,rand,deg_rand):
     return N,Q,I,sss,pww
 
 
-
-####################TRASH FOLLOWS#########################
-   
-
-
-def plotRidge(df,typ,measur,patt):
-    # import numpy as np
-    # import pandas as pd
-    # 
-    # import matplotlib.pyplot as plt
-    sns.set_theme(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
-
-    # Create the data
-    # rs = np.random.RandomState(1979)
-    # x = rs.randn(XX0)
-    # g = np.tile(list("ABCDEFGHIJ"), XX)
-    # df = pd.DataFrame(dict(x=x, g=g))
-    # m = df.g.map(ord)
-    # df["x"] += m
-
-    # Initialize the FacetGrid object
-    pal = sns.cubehelix_palette(10, rot=-.25, light=.7)
-    g = sns.FacetGrid(df[df['type']==typ], row="gen", hue="gen", aspect=20, height=.5, palette=pal)
-
-    # Draw the densities in a few steps
-    g.map(sns.kdeplot, "value",
-          bw_adjust=.5, clip_on=False,
-          fill=True, alpha=1, linewidth=1.5)
-    g.map(sns.kdeplot, "value", clip_on=False, color="w", lw=2, bw_adjust=.5)
-
-    # passing color=None to refline() uses the hue mapping
-    g.refline(y=0, linewidth=2, linestyle="-", color=None, clip_on=False)
-
-
-    # Define and use a simple function to label the plot in axes coordinates
-    def label(x, color, label):
-        ax = plt.gca()
-        ax.text(0, .2, label, fontweight="bold", color=color,
-                ha="left", va="center", transform=ax.transAxes)
-
-
-    g.map(label, "value")
-
-    # Set the subplots to overlap
-    g.figure.subplots_adjust(hspace=-.25)
-
-    # Remove axes details that don't play well with overlap
-    g.set_titles("")
-    g.set(yticks=[], ylabel="")
-    g.despine(bottom=True, left=True)
-    plt.savefig("data/gcn/"+patt+"_"+str(measur)+".png",dpi=300,bbox_inches = "tight")
-
-    
-    #!/usr/bin/env python
-"""
-Plot multi-graphs in 3D.
-"""
-# import numpy as np
-# import matplotlib.pyplot as plt
-# import networkx as nx
-
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Line3DCollection
-
-
-class LayeredNetworkGraph(object):
-
-    def __init__(self, graphs, node_labels=None, layout=nx.spring_layout, ax=None):
-        """Given an ordered list of graphs [g1, g2, ..., gn] that represent
-        different layers in a multi-layer network, plot the network in
-        3D with the different layers separated along the z-axis.
-
-        Within a layer, the corresponding graph defines the connectivity.
-        Between layers, nodes in subsequent layers are connected if
-        they have the same node ID.
-
-        Arguments:
-        ----------
-        graphs : list of networkx.Graph objects
-            List of graphs, one for each layer.
-
-        node_labels : dict node ID : str label or None (default None)
-            Dictionary mapping nodes to labels.
-            If None is provided, nodes are not labelled.
-
-        layout_func : function handle (default networkx.spring_layout)
-            Function used to compute the layout.
-
-        ax : mpl_toolkits.mplot3d.Axes3d instance or None (default None)
-            The axis to plot to. If None is given, a new figure and a new axis are created.
-
-        """
-
-        # book-keeping
-        self.graphs = graphs
-        self.total_layers = len(graphs)
-
-        self.node_labels = node_labels
-        self.layout = layout
-
-        if ax:
-            self.ax = ax
-        else:
-            fig=plt.figure(figsize=(5,15))
-            self.ax = fig.add_subplot(111, projection='3d')
-
-        # create internal representation of nodes and edges
-        self.get_nodes()
-        self.get_edges_within_layers()
-        self.get_edges_between_layers()
-
-        # compute layout and plot
-        self.get_node_positions()
-        self.draw()
-
-
-    def get_nodes(self):
-        """Construct an internal representation of nodes with the format (node ID, layer)."""
-        self.nodes = []
-        for z, g in enumerate(self.graphs):
-            self.nodes.extend([(node, z) for node in g.nodes()])
-
-
-    def get_edges_within_layers(self):
-        """Remap edges in the individual layers to the internal representations of the node IDs."""
-        self.edges_within_layers = []
-        for z, g in enumerate(self.graphs):
-            self.edges_within_layers.extend([((source, z), (target, z)) for source, target in g.edges()])
-
-
-    def get_edges_between_layers(self):
-        """Determine edges between layers. Nodes in subsequent layers are
-        thought to be connected if they have the same ID."""
-        self.edges_between_layers = []
-        for z1, g in enumerate(self.graphs[:-1]):
-            z2 = z1 + 1
-            h = self.graphs[z2]
-            shared_nodes = set(g.nodes()) & set(h.nodes())
-            self.edges_between_layers.extend([((node, z1), (node, z2)) for node in shared_nodes])
-
-
-    def get_node_positions(self, *args, **kwargs):
-        """Get the node positions in the layered layout."""
-        # What we would like to do, is apply the layout function to a combined, layered network.
-        # However, networkx layout functions are not implemented for the multi-dimensional case.
-        # Futhermore, even if there was such a layout function, there probably would be no straightforward way to
-        # specify the planarity requirement for nodes within a layer.
-        # Therefor, we compute the layout for the full network in 2D, and then apply the
-        # positions to the nodes in all planes.
-        # For a force-directed layout, this will approximately do the right thing.
-        # TODO: implement FR in 3D with layer constraints.
-
-        composition = self.graphs[0]
-        for h in self.graphs[1:]:
-            composition = nx.compose(composition, h)
-
-        pos = self.layout(composition, *args, **kwargs)
-
-        self.node_positions = dict()
-        for z, g in enumerate(self.graphs):
-            self.node_positions.update({(node, z) : (*pos[node], z) for node in g.nodes()})
-
-
-    def draw_nodes(self, nodes, *args, **kwargs):
-        x, y, z = zip(*[self.node_positions[node] for node in nodes])
-        self.ax.scatter(x, y, z, *args, **kwargs)
-
-
-    def draw_edges(self, edges, *args, **kwargs):
-        segments = [(self.node_positions[source], self.node_positions[target]) for source, target in edges]
-        line_collection = Line3DCollection(segments, *args, **kwargs)
-        self.ax.add_collection3d(line_collection)
-
-
-    def get_extent(self, pad=0.1):
-        xyz = np.array(list(self.node_positions.values()))
-        xmin, ymin, _ = np.min(xyz, axis=0)
-        xmax, ymax, _ = np.max(xyz, axis=0)
-        dx = xmax - xmin
-        dy = ymax - ymin
-        return (xmin - pad * dx, xmax + pad * dx), \
-            (ymin - pad * dy, ymax + pad * dy)
-
-
-    def draw_plane(self, z, *args, **kwargs):
-        (xmin, xmax), (ymin, ymax) = self.get_extent(pad=0.1)
-        u = np.linspace(xmin, xmax, 10)
-        v = np.linspace(ymin, ymax, 10)
-        U, V = np.meshgrid(u ,v)
-        W = z * np.ones_like(U)
-        self.ax.plot_surface(U, V, W, *args, **kwargs)
-
-
-    def draw_node_labels(self, node_labels, *args, **kwargs):
-        for node, z in self.nodes:
-            if node in node_labels:
-                ax.text(*self.node_positions[(node, z)], node_labels[node], *args, **kwargs)
-
-
-    def draw(self):
-
-        self.draw_edges(self.edges_within_layers,  color='k', alpha=0.3, linestyle='-', zorder=2)
-        self.draw_edges(self.edges_between_layers, color='k', alpha=0.3, linestyle='--', zorder=2)
-
-        for z in range(self.total_layers):
-            self.draw_plane(z, alpha=0.2, zorder=1)
-            self.draw_nodes([node for node in self.nodes if node[1]==z], s=300, zorder=3)
-
-        if self.node_labels:
-            self.draw_node_labels(self.node_labels,
-                                  horizontalalignment='center',
-                                  verticalalignment='center',
-                                  zorder=100)
-
-
-# if __name__ == '__main__':
-
-
-
-
-def plot_sankey(data,XX,A,B):
-    # https://gist.github.com/nicolasesnis/595d34c3c7dbca2b3419332304954433
-    # Working on the nodes_dict
-
-    all_events = list(data[B].unique())
-
-    # Create a set of colors that you'd like to use in your plot.
-    palette = ['50BE97', 'E4655C', 'FBEEAC', '3E5066',
-               'BFD6DE', 'FCC865', '353A3E', 'E6E6E6']#,
-              # 'E4655C', 'FBEEAC', '3E5066',
-               # 'BFD6DE', 'FCC865', '353A3E', 'E6E6E6']
-    #  Here, I passed the colors as HEX, but we need to pass it as RGB. This loop will convert from HEX to RGB:
-    for i, col in enumerate(palette):
-        palette[i] = tuple(int(col[i:i+2], 16) for i in (0, 2, 4))
-
-    # Append a Seaborn complementary palette to your palette in case you did not provide enough colors to style every event
-    complementary_palette = sns.color_palette("deep", len(all_events) - len(palette))
-    if len(complementary_palette) > 0:
-        palette.extend(complementary_palette)
-
-    output = dict()
-    output.update({'nodes_dict': dict()})
-
-    i = 0
-    for t in data.t.unique(): # For each tri of clus...
-        # Create a new key equal to the tri...
-        output['nodes_dict'].update(
-            {t: dict()}
-        )
-
-        # Look at all the events that were done at this step of the funnel...
-        all_events_at_this_rank = data[data.t ==
-                                       t][B].unique()
-
-        # Read the colors for these events and store them in a list...
-        tri_palette = []
-        for clus in all_events_at_this_rank:
-            tri_palette.append(palette[list(all_events).index(clus)])
-
-        # Keep trace of the events' names, colors and indices.
-        output['nodes_dict'][t].update(
-            {
-                'sources': list(all_events_at_this_rank),
-                'color': tri_palette,
-                'sources_index': list(range(i, i+len(all_events_at_this_rank)))
-            }
-        )
-        # Finally, increment by the length of this rank's available clus to make sure next indices will not be chosen from existing ones
-        i += len(output['nodes_dict'][t]['sources_index'])
-        
-        
-    # Working on the links_dict
-
-    output.update({'links_dict': dict()})
-
-    # Group the DataFrame by pat_epi and tri
-
-
-    grouped = data.groupby([A, 't'])
-    jaws=0
-    # Define a function to read the souces, targets, values species to next_clus:
-    def update_source_target(user):
+def shuffle_net(df, n=1, axis=0):     
+    df = df.copy()
+    for _ in range(n):
+        df.apply(np.random.shuffle, axis=axis)
+    return df
+#https://stackoverflow.com/questions/15772009/shuffling-permutating-a-dataframe-in-pandas
+
+def create_data(path,rand):    
+    C=pd.read_csv(path,header=0)#,'type','init'],sep='\t')
+    #### for randomized samples
+    C=C[C['name']!='name']
+    C['R']=C['R'].str.replace("False", "0")
+    # pd.unique(C['name'])
+    C=C[C['R']==rand]
+    del C['R']
+
+    # ####
+    C['type']=C['name'].str.split('_').str[1]+'_'+C['name'].str.split('_').str[2]
+    C['type']=C['type'].str.replace("_00", "_00ST")
+    # # C=C[~C['type'].str.contains("03")]
+    C['type']=C['type'].str.replace("_03ST", "_02ST")
+    C['type']=C['type'].str.replace("_00STST", "_00ST")
+    C['sample']=C['name'].str.split('_').str[0]
+    C=C[C['N']!='0.0']
+    # C=C[~C['name'].duplicated(keep='last')]
+    C=C[~C[['type','sample']].duplicated(keep='last')]
+    del C['name']
+    C.reset_index(inplace=True)
+    del C['index']
+    D=C.pivot(index='sample', columns='type', values=['N','I','Q'])
+    D=D.astype('float')
+    return D
+
+def form_tests(data,var,level):
+    E0=data[var].reset_index()
+    E0=E0[['sample',level+'_00ST',level+'_01ST',level+'_02ST']]
+    E0['var']=var
+    return E0
+def merge_form(data,level):
+    E0=form_tests(data,'N',level)
+    E1=form_tests(data,'I',level)
+    E2=form_tests(data,'Q',level)
+    E=E0.append(E1)
+    E=E.append(E2)
+    return E
+def output_data(D):
+    E=merge_form(D,'CLA')
+    G=merge_form(D,'LEVO')
+    F=merge_form(D,'OTHER')
+    H=E.merge(G,on=['sample','var'])
+    H=H.merge(F,on=['sample','var'])
+    # H.set_index(['var','sample'],inplace=True)
+    # del H['var_x'],H['var_y']#,H0['type']
+    return H
+
+
+def makeSYNCSAnet(relgene,graphs,JEFF,META,deg_rand):
+# for i,net in tqdm.tqdm(enumerate(BX_graphs)):
+# for ii,i in tqdm():
+    for ii,i in (enumerate(relgene.columns[1:])):
+        ccc=nx.convert_matrix.to_pandas_edgelist(graphs[ii])
+        ee=nx.convert_matrix.to_pandas_edgelist(graphs[ii])
+        # cc['weight']=np.random.randn(len(cc))
+        pww=i
+        j=(i.split('-')[1])
+        i=(i.split('-')[0])
         try:
-            # user.name[0] is the user's spec; user.name[1] is the time
-            # 1st we retrieve the source and target's indices from nodes_dict
-            source_index = output['nodes_dict'][user.name[1]]['sources_index'][output['nodes_dict']
-                                                                               [user.name[1]]['sources'].index(user[B].values[0])]
-            target_index = output['nodes_dict'][user.name[1] + 1]['sources_index'][output['nodes_dict']
-                                                                                   [user.name[1] + 1]['sources'].index(user['next_clus'].values[0])]
-            # print(user.name)
-             # If this source is already in links_dict...
-            if source_index in output['links_dict']:
-                # ...and if this target is already associated to this source...
-                if target_index in output['links_dict'][source_index]:
-                    # ...then we increment the count of users with this source/target pair by 1
-                    output['links_dict'][source_index][target_index]['unique_users'] += 1
-                # ...but if the target is not already associated to this source...
-                else:
-                    # ...we create a new key for this target, for this source, and initiate it with 1 user and the time from source to target
-                    output['links_dict'][source_index].update({target_index:
-                                                               dict(
-                                                                   {'unique_users': 0}
-                                                                )
-                                                               })
-            # ...but if this source isn't already available in the links_dict, we create its key and the key of this source's target, and we initiate it with 1 user and the time from source to target
+            rrr=str(META[META['id']==i].index.item())+'_'+str(META[META['id']==i]['group'].item())+'_'+str(j)
+            ccc.rename(columns={ccc.columns[2]:rrr},inplace=True)
+            ddd=ccc[ccc['source'].str.contains('UniRef')]
+            ddd[['source','target']] = ddd[['target','source']]
+            ccc=ccc[~ccc['source'].str.contains('UniRef')].append(ddd)
+            if deg_rand!=0:
+                aa=pd.DataFrame(ccc)
+                pcc=aa.sample(frac=np.float(deg_rand), replace=False, random_state=1) ##degree randomized
+                pol=aa[~aa.isin(pcc)].dropna(how='all')
+                pcc.reset_index(inplace=True)
+                del pcc['index']
+                lll=shuffle_net(pcc)
+                ccc=pd.concat([pol,lll])
+                del aa,pol,pcc,lll
+
+            # a,b=pd.factorize(ccc['source']) 
+            # c,d=pd.factorize(ccc['target'])
+            # rrr=pd.DataFrame()
+            # rrr['from']=a
+            # rrr['to']=c
+            # rrr['value']=1
+            # sss=str(META[META['id']==i]['group'].item())+'_'+str(j)
+            # Path('~/nest/'+sss).mkdir(parents=True, exist_ok=True)
+            # rrr[['from','to','value']].to_csv('~/nest/'+sss+'/'+str(ccc.columns[2])+'.csv',sep=' ',index=False,header=False)
+            # ee.rename(columns={ee.columns[2]:sss},inplace=True)
+            print(ii)
+
+            if ii==0:
+                dd=ccc
+                # ff=ee
             else:
-                output['links_dict'].update({source_index: dict({target_index: dict(
-                    {'unique_users': 0})})})
-        except Exception as e:
-            pass
-
-    # Apply the function to your grouped Pandas object:
-    grouped.apply(lambda user: update_source_target(user)) 
-
-
-    targets = []
-    sources = []
-    values = []
-
-    for source_key, source_value in output['links_dict'].items():
-        for target_key, target_value in output['links_dict'][source_key].items():
-            sources.append(source_key)
-            targets.append(target_key)
-            values.append(target_value['unique_users'])
-
-    labels = []
-    colors = []
-
-    for key, value in output['nodes_dict'].items():
-        labels = labels + list(output['nodes_dict'][key]['sources']) 
-        colors = colors + list(output['nodes_dict'][key]['color'])
-    for idx, color in enumerate(colors):
-        colors[idx] = "rgb" + str(color) + ""
-    # [len(targets),len(sources),len(values)]
-    return labels,color,sources,targets,values
+                dd=dd.merge(ccc,on=['source','target'],how='outer')
+                # ff=ff.merge(ee,on=['source','target'],how='outer')
+            del ddd,rrr,ee,ccc
+        except:
+            print('no match for '+str(i))
+    return dd
     
+
+# names=pd.unique(dd.columns.str.split('_').str[1]+'_'+dd.columns.str.split('_').str[2])[1:]
+# for i in tqdm(names):
+
+def group4SYNCSA(i,dd,DR):
+    # ff.columns = ff.columns.str.strip('_x')
+    # ff.columns = ff.columns.str.strip('_y')
+    # i=i.split('_')[1]+'_'+i.split('_')[2]
+    ff=dd.loc[:,dd.columns.str.contains(i)]
+    ff[['source','target']]=dd[['source','target']]
+    ff=ff[ff['source'].str.contains('s__')]
+    ff=ff[ff['target'].str.contains('UniRef')]
+    comm=ff.groupby('source').sum().transpose()
+    comm.to_csv('~/SYNCSA_eval/'+str(DR)+'_rand_comm_'+i+'.csv')
+    ff.reset_index(inplace=True)
+    ff.set_index(['source', 'target'], inplace=True)
+    del ff['index']
+    ff.columns=(ff.columns.str.split('_').str[1]+'_'+ff.columns.str.split('_').str[2])
+    gg=ff.groupby(by=ff.columns, axis=1).sum()
+    # traits=gg[[i]].reset_index().pivot('source','target',i).dropna(how='all',axis=1).replace(np.nan,0)
+    traits=gg[[i]].reset_index().groupby(['source','target']).mean().reset_index().pivot('source','target',i).dropna(how='all',axis=1).replace(np.nan,0)
+
+    traits.to_csv('~/SYNCSA_eval/'+str(DR)+'_rand_trait_'+i+'.csv')
+
+
+def research_orthologs(uniID, species):
+    '''
+    research orthologs of a specific UniProtID in the inparanoid database available on the web
+    save the info in the neo4j database
+    '''
+    # import urllib
+    
+    url="http://inparanoid.sbc.su.se/cgi-bin/gene_search.cgi?idtype=all;all_or_selection=all;scorelimit=0.05;rettype=xml;id=" + uniID
+    # request = request(url)
+    # for n in range(10):
+
+    response = request.urlopen(url)
+    txml = response.read()
+    root = ET.fromstring(txml)
+    for cluster in root.iter('cluster'):
+        # print(cluster)
+        c = cluster.attrib['nr']			#Cluster ID
+        for p in cluster.iter('protein'):
+            pid = p.attrib['prot_id']
+            spec = p.attrib['speclong']
+            if spec in species:
+                P=pid
+                S=spec
+    return P,S
+
+def dgtz(A):
+    bis=np.round(np.sqrt(len(A))).astype(int)
+    # bisA=np.abs(np.round((np.round(np.min(A),-1)-np.round(np.max(A),-1))/bis))
+    # binA=np.arange(np.round(np.min(A),-1),np.round(np.max(A),-1),bisA)
+    bisA=np.abs(np.round(np.min(A))-(np.max(A))/bis)
+    binA=np.arange((np.min(A)),(np.max(A)),bisA)
+    tmpA=np.digitize(A,bins=binA)
+    return tmpA,bis
+
+def shan_entropy(c):
+    c_normalized = c / (np.sum(c))
+    c_normalized = c_normalized[np.nonzero(c_normalized)]
+    H = -sum(c_normalized* np.log2(c_normalized))  
+    return H
+
+def get_red(c_X,c_Y,c_Z,c_XZ,c_YZ):
+    SI0=np.sum(np.nan_to_num(np.divide(c_XZ,c_Z)*(np.log10(np.divide(c_XZ,(np.matmul(c_X,c_Z))))), posinf=0, neginf=0),axis=0)
+    SI1=np.sum(np.nan_to_num(np.divide(c_YZ,c_Z)*(np.log10(np.divide(c_YZ,(np.matmul(c_Y,c_Z))))), posinf=0, neginf=0),axis=0) ##maybe along axis=1
+    minSI=np.min([SI0,SI1])
+    red=np.sum((c_Z)*minSI)
+    return red,SI0,SI1
+            
+def calc_MI(H_X,H_Y,H_XY):
+    return H_X + H_Y - H_XY
+    
+def calc_CMI(H_XZ,H_YZ,H_XYZ,H_Z):
+    return H_XZ+H_YZ+H_XYZ-H_Z
+def calc_II(CMI_XY,MI_XY):
+    return CMI_XY-MI_XY
+
+
+# cdf=[]
+# pucN=[]
+# data=pd.read_csv('data/Pipeline_consolidate_220301/UP_gene_sum_Lx.txt',sep='\t',header=None,index_col=0)
+# data=data[1:12]
+# for i in np.arange(1,len(data)):
+# @jit(nopython=True)
+def puc_cal(data,i,genes,cdf,puc_genes):
+    if cdf!=[]:
+        tiss=str(cdf)
+        cdf=[]
+    if puc_genes!=[]:
+        omic=str(puc_genes)
+        puc_genes=[]
+    for j in (np.arange(1,len(data))):#,position=1, desc="j", leave=False, colour='magenta'):
+        pucN=[];
+        for k in (np.arange(1,len(data))):#,position=2, desc="k", leave=False, colour='cyan'):
+            # try:
+                # time.sleep(0.5)
+            puc=0
+            if (i!=j)&(i!=k)&(j!=k):
+                # print(i,j,k)
+                A=np.array(data.iloc[i]).tolist()
+                B=np.array(data.iloc[j]).tolist()
+                C=np.array(data.iloc[k]).tolist()
+                # print(A)
+        # A=np.array(data[1]).tolist()
+        # B=np.array(data[2]).tolist()
+        # C=np.array(data[3]).tolist()
+
+                tmpA,ba=dgtz(A);
+                tmpB,bb=dgtz(B);
+                tmpC,cc=dgtz(C)
+                A=tmpA/np.sum(tmpA);B=tmpB/np.sum(tmpB);C=tmpC/np.sum(tmpC);
+                b=np.round(np.sqrt(len(A))).astype(int)
+
+                c_XY = np.histogramdd([A,B],bins=(b,b))[0]
+                c_XZ = np.histogramdd([A,C],bins=(b,b))[0]
+                c_YZ = np.histogramdd([B,C],bins=(b,b))[0]
+                c_XYZ = np.histogramdd([A,B,C],bins=(b,b,b))[0]
+                c_Z = np.histogramdd([C],bins=(b))[0]
+                c_Y = np.histogramdd([B],bins=(b))[0]
+                c_X = np.histogramdd([A],bins=(b))[0]
+
+                # H=[]
+                # for ii,i in enumerate([c_X,c_Y,c_Z,c_XY,c_XZ,c_YZ,c_XYZ]):
+                    # i.split('_')[1]
+                H_X= shan_entropy(c_X)
+                H_Y = shan_entropy(c_Y)
+                H_Z = shan_entropy(c_Z)
+                H_XY = shan_entropy(c_XY)
+                H_XZ = shan_entropy(c_XZ)
+                H_YZ = shan_entropy(c_YZ)
+                H_XYZ = shan_entropy(c_XYZ)
+
+
+                MIxy=calc_MI(H_X,H_Y,H_XY)
+                MIxz=calc_MI(H_X,H_Z,H_XZ)
+                MIyz=calc_MI(H_Z,H_Y,H_YZ)
+
+                CMIx=calc_CMI(H_XZ,H_XY,H_XYZ,H_X)
+                CMIy=calc_CMI(H_XY,H_YZ,H_XYZ,H_Y)
+                CMIz=calc_CMI(H_XZ,H_YZ,H_XYZ,H_Z)
+
+                [calc_II(CMIz,MIxy),
+                calc_II(CMIy,MIxz),
+                calc_II(CMIx,MIyz)]
+
+                rX=get_red(c_X,c_Z,c_Y,c_XY,c_XZ)
+                rY=get_red(c_X,c_Y,c_Z,c_XZ,c_YZ)
+                rZ=get_red(c_Y,c_X,c_Z,c_YZ,c_XY)
+    #                 # [rX[0],rY[0],rZ[0]]
+
+    #                 Szxy=calc_II(CMIz,MIxy)+rX[0]
+
+                u_xy=MIxy-rZ[0]
+                u_xz=MIxz-rY[0]
+                u_yz=MIyz-rX[0]
+
+    #                 PID=Szxy + u_xz + u_yz + rZ[0]
+                # PID
+
+                # if j!=k:
+                puc+=(u_xy/MIxy)
+                # print(puc)
+
+                    # else:
+                    #     puc.append(1)
+                # except:
+                #     print(i,j,k)
+                # print(puc)
+                # pucN.append(puc)
+
+            # if i!=j:
+            cdf.append(puc)
+            puc_genes.append([genes[i],genes[j]])
+            
+            
+            # if (i!=j)&(i!=k)&(j!=k):
+            #     cdf.append(pucN)
+        with open('data/Pipeline_consolidate_220301/gcn/'+tiss+'_'+omic+'_cdf.pkl', 'wb') as f:
+            pickle.dump(cdf, f)
+        with open('data/Pipeline_consolidate_220301/gcn/'+tiss+'_'+omic+'_puc_genes.pkl', 'wb') as f:
+            pickle.dump(puc_genes, f)
+        # p = Path('data/Pipeline_consolidate_220301/gcn/'+tiss+'_'+omic+'_cdf.npy')
+        # with p.open('ab') as f:
+        #     np.save(f, cdf)
+        # p = Path('data/Pipeline_consolidate_220301/gcn/'+tiss+'_'+omic+'_puc_genes.npy')
+        # with p.open('ab') as f:
+        #     np.save(f, puc_genes)
+        
+        # return cdf, puc_genes

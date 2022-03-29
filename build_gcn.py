@@ -2,14 +2,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import os,glob,sys,importlib,pickle,tqdm
-from joblib import Parallel
+from joblib import Parallel,delayed
+import multiprocessing
+
 import networkx as nx
 patt='all'
 sys.path.insert(1, './run/gcn/')
 import gcn_func
 importlib.reload(sys.modules['gcn_func'])
-from gcn_func import bip, load_list_of_dicts, meas, time_bar,proc_dat,rev_tbar,group_time_plot,time_order_net,build_gcn#plotRidge,LayeredNetworkGraph,plot_sankey
-
+# from gcn_func import bip, load_list_of_dicts, meas, time_bar,proc_dat,rev_tbar,group_time_plot,time_order_net,build_gcn#plotRidge,LayeredNetworkGraph,plot_sankey
+from gcn_func import dgtz,shan_entropy,get_red,calc_MI,calc_CMI,calc_II,puc_cal
 ###BUILD BI-NETS
 # relgene=pd.read_csv('all_arg_subset_genefamilies-cpm.tsv',sep='\t')
 # relgene['gene']=relgene['# Gene Family'].str.split('|').str[0]
@@ -52,33 +54,52 @@ from gcn_func import bip, load_list_of_dicts, meas, time_bar,proc_dat,rev_tbar,g
 
     
 ##NESTEDNESS ANALYSIS
-print(sys.argv[1])
-cc=int(sys.argv[1])
-rand=(sys.argv[2])
-deg_rand=float(sys.argv[3])
-# print(cc)
-# cc=int(cc)
-dd=cc+10
-from gcn_func import bip, load_list_of_dicts, meas, plotRidge,structural_analysis
+# print(sys.argv[1])
+# cc=int(sys.argv[1])
+# rand=(sys.argv[2])
+# deg_rand=float(sys.argv[3])
+# # print(cc)
+# # cc=int(cc)
+# dd=cc+10
+# from gcn_func import bip, load_list_of_dicts, meas, plotRidge,structural_analysis
 
-relgene=pd.read_csv('all_arg_subset_genefamilies-cpm.tsv',sep='\t',nrows=1)
-graphs = load_list_of_dicts('data/gcn/NX_Emore_ARG.pkl')
-ARG_meta0=pd.read_excel('run/gcn/ARG_treatment_infor_modified.xlsx',index_col=0)
-ARG_meta2=pd.read_excel('run/gcn/patients_Tx_batch3_for_DM.xlsx',index_col=None,skiprows=1,names=['id','group'])
-relgene.columns=relgene.columns.str.replace("-00", "-00ST")
-relgene.columns=relgene.columns.str.replace("-00STST", "-00ST")
-relgene.columns=relgene.columns.str.split('-').str[0]+'-'+relgene.columns.str.split('-').str[1]
-ARG_meta=pd.concat([pd.DataFrame(ARG_meta0[['id','group']]),ARG_meta2],ignore_index=True)
-ARG_meta['id']=ARG_meta['id'].str.replace('-00ST','')
+# relgene=pd.read_csv('all_arg_subset_genefamilies-cpm.tsv',sep='\t',nrows=1)
+# graphs = load_list_of_dicts('data/gcn/NX_Emore_ARG.pkl')
+# ARG_meta0=pd.read_excel('run/gcn/ARG_treatment_infor_modified.xlsx',index_col=0)
+# ARG_meta2=pd.read_excel('run/gcn/patients_Tx_batch3_for_DM.xlsx',index_col=None,skiprows=1,names=['id','group'])
+# relgene.columns=relgene.columns.str.replace("-00", "-00ST")
+# relgene.columns=relgene.columns.str.replace("-00STST", "-00ST")
+# relgene.columns=relgene.columns.str.split('-').str[0]+'-'+relgene.columns.str.split('-').str[1]
+# ARG_meta=pd.concat([pd.DataFrame(ARG_meta0[['id','group']]),ARG_meta2],ignore_index=True)
+# ARG_meta['id']=ARG_meta['id'].str.replace('-00ST','')
 
-for ii,i in enumerate(relgene.columns[cc:dd]):
-    # N,Q,I,R=Parallel(n_jobs=10) (
-    structural_analysis(ii,i,graphs,ARG_meta,rand=rand,deg_rand=deg_rand)
-# for ii,i in enumerate(relgene.columns[10:]):
-    # structural_analysis(ii,i,graphs,ARG_meta)# for ii,i in enumerate(relgene.columns[cc:dd]))
-
-
-# structural_analysis(ii,i,graphs,ARG_meta) for ii,i in enumerate(relgene.columns[3:])
+# for ii,i in enumerate(relgene.columns[cc:dd]):
+#     # N,Q,I,R=Parallel(n_jobs=10) (
+#     structural_analysis(ii,i,graphs,ARG_meta,rand=rand,deg_rand=deg_rand)
+# # for ii,i in enumerate(relgene.columns[10:]):
+#     # structural_analysis(ii,i,graphs,ARG_meta)# for ii,i in enumerate(relgene.columns[cc:dd]))
 
 
-# pd.DataFrame([N,Q,I,R]).to_csv('Emore_ARG_nested_an.txt',sep='\t')
+# # structural_analysis(ii,i,graphs,ARG_meta) for ii,i in enumerate(relgene.columns[3:])
+
+
+# # pd.DataFrame([N,Q,I,R]).to_csv('Emore_ARG_nested_an.txt',sep='\t')
+
+tissue=sys.argv[1]
+omic=sys.argv[2]
+
+##PIDC analysis
+cdf=[]
+data=pd.read_csv('data/Pipeline_consolidate_220301/'+tissue+'_gene_sum_'+omic+'.txt',sep='\t',header=None,index_col=0)
+# data=data[1:100]
+genes=data.index
+# print(data.shape)
+num_cores = multiprocessing.cpu_count()
+Parallel(n_jobs=num_cores)(delayed(puc_cal)(data,i,genes,str(tissue),str(omic)) for i in np.arange(1,len(data)))
+
+# for i in np.arange(1,len(data)):
+#     puc_cal(data,i,genes,str(tissue),str(omic))
+# with open('data/Pipeline_consolidate_220301/gcn/'+tissue+'_'+omic+'cdf_ALL.pkl', 'wb') as f:
+#     pickle.dump(cdf, f)
+# with open('data/Pipeline_consolidate_220301/gcn/'+tissue+'_'+omic+'pucN_ALL.pkl', 'wb') as f:
+#     pickle.dump(pucN, f)
