@@ -1,12 +1,12 @@
 #!/bin/bash
-#PBS -l nodes=1:ppn=64
-#PBS -l mem=100g
+#PBS -l nodes=1:ppn=40
+#PBS -l mem=120g
 #PBS -l walltime=24:00:00
 #PBS -N gcn_$dg
 #PBS -q cgsd
 #PBS -e .GCerr
 #PBS -o .GCout
-##qsub -v dg=0 run/gcn/gcn.sh
+##qsub -v dg=0 run/gcn/gcn.shq
 ##qsub run/gcn/gcn.sh
 
 module purge
@@ -113,19 +113,19 @@ pats=$(ls $patdir)
 
 
 # function buildd {
-# pat=$1
-# python run/gcn/build_gcn.py $group False 0 &
-# python run/gcn/build_gcn.py $group True .2 &
-# python run/gcn/build_gcn.py $group True .99
-# # done
-# echo $folder
+# group=$1
+# python run/gcn/build_gcn.py $group
+# # python run/gcn/build_gcn.py $group True .2 &
+# # python run/gcn/build_gcn.py $group True .99
+# # # done
+# # echo $folder
 # }
 
 # export -f buildd
-# parallel -j 3 buildd  ::: $(seq 1 10 130)
+# parallel -j 10 buildd  ::: $(seq 1 10 130)
 
 
 # python run/gcn/nested_analysis.py
 
-python run/gcn/build_gcn.py $a $b
+python run/gcn/build_gcn.py #$a $b
 # echo $a

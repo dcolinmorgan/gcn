@@ -10,7 +10,7 @@ import networkx as nx
 # import networkit as nk
 from networkx.algorithms import bipartite
 from joblib import Parallel
-from gcn_func import bip, load_list_of_dicts, meas, plotRidge, time_bar, rev_tbar, proc_dat
+from gcn_func import bip, load_list_of_dicts, meas, time_bar, rev_tbar, proc_dat
 
 primary=pd.read_excel('data/Data Raw - Gut Microbiome Cohort Project Database - 300 Cohort v3.0_280921.xlsx',index_col=0,sheet_name='Primary Data')
 diet=pd.read_excel('data/Data Raw - Gut Microbiome Cohort Project Database - 300 Cohort v3.0_280921.xlsx',index_col=0,sheet_name='Diet Data')

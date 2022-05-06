@@ -3,12 +3,14 @@ import numpy as np
 import os,glob,sys,importlib,pickle#,scipy,coolbox,pybedtools,
 # from tqdm import tqdm
 from scipy.stats import rankdata
+from functools import reduce
 import pandas as pd
 import networkx as nx
 import seaborn as sns
 from joblib import delayed, wrap_non_picklable_objects
 from pathlib import Path
 import plotly
+from networkx import bipartite
 from numba import jit
 from joblib import Parallel
 import sklearn.utils as sku
@@ -361,8 +363,10 @@ def buildSYNCSA(dd):
         # i=i.split('_')[1]+'_'+i.split('_')[2]
         ff=dd.loc[:,dd.columns.str.contains(i)]
         ff[['source','target']]=dd[['source','target']]
-        ff=ff[ff['source'].str.contains('s__')]
-        ff=ff[ff['target'].str.contains('UniRef')]
+        # ff=ff[ff['source'].str.contains('s__')]
+        # ff=ff[ff['target'].str.contains('UniRef')]
+        ff.source, ff.target = np.where(ff.source.str.contains('UniRef'), [ff.target, ff.source], [ff.source, ff.target])
+
         ff.groupby('source').sum().transpose().to_csv('comm_'+i+'.csv')
         ff.reset_index(inplace=True)
         ff.set_index(['source', 'target'], inplace=True)
@@ -392,16 +396,21 @@ def structural_analysis(ii,i,graphs,ARG_meta,rand,deg_rand):
     rrr=str(ARG_meta[ARG_meta['id']==i].index.item())+'_'+str(ARG_meta[ARG_meta['id']==i]['group'].item())+'_'+str(j)
     ccc.rename(columns={ccc.columns[2]:rrr},inplace=True)
     
-    a,b=pd.factorize(ccc['source']) 
-    c,d=pd.factorize(ccc['target'])
-    rrr=pd.DataFrame()
-    rrr['from']=a
-    rrr['to']=c
-    rrr['value']=1
+#     a,b=pd.factorize(ccc['source']) 
+#     c,d=pd.factorize(ccc['target'])
+#     rrr=pd.DataFrame()
+    
+#     rrr['from']=a
+#     rrr['to']=c
+#     rrr['value']=1
     sss=str(ARG_meta[ARG_meta['id']==i]['group'].item())+'_'+str(j)
     Path('nest/'+sss).mkdir(parents=True, exist_ok=True)
     # rrr[['from','to','value']].to_csv('~/nest/'+sss+'/'+str(ccc.columns[2])+'.csv',sep=' ',index=False,header=False)
-    aa= rrr[['from','to','value']].values
+    # ccc.to_csv('~/nest/'+sss+'/'+str(ccc.columns[2])+'.txt',sep='\t',index=False,header=False)
+    # np.transpose(pd.DataFrame([a,b])).to_csv('~/nest/'+sss+'/source_'+str(pww)+'.txt',sep='\t',index=False,header=False)
+    # np.transpose(/'pd.DataFrame([c,d])).to_csv('~/nest/'+sss+'/target_'+str(pww)+'.txt',sep='\t',index=False,header=False)
+    # aa= ccc[['from','to','value']].values
+    aa=ccc.values
     
     if rand==True: ## to randomize
         aa=pd.DataFrame(aa)
@@ -409,17 +418,25 @@ def structural_analysis(ii,i,graphs,ARG_meta,rand,deg_rand):
         rrr=aa[~aa.isin(ddd)].dropna(how='all')
         ddd.reset_index(inplace=True)
         del ddd['index']
-        sss=shuffle(ddd)
-        aa=pd.concat([rrr,sss])
+        ssst=shuffle(ddd)
+        aa=pd.concat([rrr,ssst])
         aa=np.array(aa).astype(int)
+        ccc.values=aa
+    # nodes_cols = int(max(aa[j,1] for j in range(aa.shape[0]))+1)
+    # nodes_rows= int(max(aa[j,0] for j in range(aa.shape[0]))+1)
+    # matrix=np.zeros((nodes_rows,nodes_cols),dtype='int')
+    # matrix=np.zeros((len(np.unique(ccc['source'])),len(np.unique(ccc['target']))),dtype='int')
+    # for j in range(aa.shape[0]):
+    #     matrix[aa[j,0],aa[j,1]] = 1
+    # M=matrix
+    M=ccc.pivot('source',columns='target',values=ccc.columns[2]).fillna(0)#.round().astype('int').to_numpy())
+    # BB=ccc.pivot('source',columns='target',values=ccc.columns[2]).fillna(0).round().astype('int')#.to_numpy())
     
-    nodes_cols = int(max(aa[j,1] for j in range(aa.shape[0]))+1)
-    nodes_rows= int(max(aa[j,0] for j in range(aa.shape[0]))+1)
-    matrix=np.zeros((nodes_rows,nodes_cols),dtype='int')
-    for j in range(aa.shape[0]):
-        matrix[aa[j,0],aa[j,1]] = 1
-    M=matrix
-
+    M=((M>0)*1).to_numpy()
+    # M.to_numpy()
+    with open('~/nest/'+sss+'/net_'+str(pww)+'.txt', "ab") as f:
+        np.savetxt(f,M,delimiter = '\t')
+    
     cols_degr=M.sum(axis=0)
     row_degr=M.sum(axis=1)
     R,C=M.shape #rows and cols
@@ -444,7 +461,13 @@ def structural_analysis(ii,i,graphs,ARG_meta,rand,deg_rand):
     zzz=[str(N),str(Q),str(I),sss]
     print(zzz)
     # np.savetxt('ARG_nest_test.txt', zzz, delimiter = '\t', fmt='%s')
-    with open("randB_ARG_nest.txt", "ab") as f:
+    dfq=pd.DataFrame({'rows': pd.Series(C_[0]), 'cols': pd.Series(C_[1])})
+    dfi=pd.DataFrame({'rows': pd.Series(Ci_[0]), 'cols': pd.Series(Ci_[1])})
+    # dfn=pd.DataFrame({'rows': pd.Series(Cn_[0]), 'cols': pd.Series(Cn_[1])})
+    dfq.to_csv('~/nest/'+sss+'/modularity_'+str(pww)+'.txt',mode='a',sep='\t',index=False,header=False)
+    dfi.to_csv('~/nest/'+sss+'/in-block_'+str(pww)+'.txt',mode='a',sep='\t',index=False,header=False)
+    # dfn.to_csv('~/nest/'+sss+'/nested_'+str(pww)+'.txt',mode='a',sep='\t',index=False,header=False)
+    with open("~/nest/randC_ARG_nest.txt", "ab") as f:
         np.savetxt(f,np.column_stack([str(N),str(Q),str(I),sss,pww]),delimiter = '\t', fmt='%s')
     return N,Q,I,sss,pww
 
@@ -603,7 +626,6 @@ def research_orthologs(uniID, species):
                 P=pid
                 S=spec
     return P,S
-
 def dgtz(A):
     bis=np.round(np.sqrt(len(A))).astype(int)
     # bisA=np.abs(np.round((np.round(np.min(A),-1)-np.round(np.max(A),-1))/bis))
@@ -619,12 +641,12 @@ def shan_entropy(c):
     H = -sum(c_normalized* np.log2(c_normalized))  
     return H
 
-def get_red(c_X,c_Y,c_Z,c_XZ,c_YZ):
-    SI0=np.sum(np.nan_to_num(np.divide(c_XZ,c_Z)*(np.log10(np.divide(c_XZ,(np.matmul(c_X,c_Z))))), posinf=0, neginf=0),axis=0)
-    SI1=np.sum(np.nan_to_num(np.divide(c_YZ,c_Z)*(np.log10(np.divide(c_YZ,(np.matmul(c_Y,c_Z))))), posinf=0, neginf=0),axis=0) ##maybe along axis=1
+def get_SI(c_X,c_Z,c_XZ):
+    return np.sum(np.nan_to_num(np.divide(c_XZ,c_Z)*(np.log10(np.divide(c_XZ,(np.matmul(c_X,c_Z))))), posinf=0, neginf=0),axis=0)
+
+def get_red(SI0,SI1,c_Z):
     minSI=np.min([SI0,SI1])
-    red=np.sum((c_Z)*minSI)
-    return red,SI0,SI1
+    return np.sum((c_Z)*minSI)
             
 def calc_MI(H_X,H_Y,H_XY):
     return H_X + H_Y - H_XY
@@ -633,7 +655,6 @@ def calc_CMI(H_XZ,H_YZ,H_XYZ,H_Z):
     return H_XZ+H_YZ+H_XYZ-H_Z
 def calc_II(CMI_XY,MI_XY):
     return CMI_XY-MI_XY
-
 
 # cdf=[]
 # pucN=[]
@@ -655,10 +676,11 @@ def puc_cal(data,i,genes,cdf,puc_genes):
                 # time.sleep(0.5)
             puc=0
             if (i!=j)&(i!=k)&(j!=k):
-                # print(i,j,k)
+                print(genes[i],genes[j],genes[k])
                 A=np.array(data.iloc[i]).tolist()
                 B=np.array(data.iloc[j]).tolist()
                 C=np.array(data.iloc[k]).tolist()
+                # print([A,B,C])
                 # print(A)
         # A=np.array(data[1]).tolist()
         # B=np.array(data[2]).tolist()
@@ -702,16 +724,20 @@ def puc_cal(data,i,genes,cdf,puc_genes):
                 calc_II(CMIy,MIxz),
                 calc_II(CMIx,MIyz)]
 
-                rX=get_red(c_X,c_Z,c_Y,c_XY,c_XZ)
-                rY=get_red(c_X,c_Y,c_Z,c_XZ,c_YZ)
-                rZ=get_red(c_Y,c_X,c_Z,c_YZ,c_XY)
+                SI_xy=get_SI(c_X,c_Y,c_XY)
+                SI_xz=get_SI(c_X,c_Z,c_XZ)
+                SI_yz=get_SI(c_Y,c_Z,c_YZ)
+                
+                rZ=get_red(SI_xz,SI_yz,c_Z)
+                rY=get_red(SI_xy,SI_yz,c_Y)
+                rX=get_red(SI_xy,SI_xz,c_X)
     #                 # [rX[0],rY[0],rZ[0]]
 
     #                 Szxy=calc_II(CMIz,MIxy)+rX[0]
 
-                u_xy=MIxy-rZ[0]
-                u_xz=MIxz-rY[0]
-                u_yz=MIyz-rX[0]
+                u_xy=MIxy-rZ#[0]
+                u_xz=MIxz-rY#[0]
+                u_yz=MIyz-rX#[0]
 
     #                 PID=Szxy + u_xz + u_yz + rZ[0]
                 # PID
@@ -730,7 +756,7 @@ def puc_cal(data,i,genes,cdf,puc_genes):
             # if i!=j:
             cdf.append(puc)
             puc_genes.append([genes[i],genes[j]])
-            
+
             
             # if (i!=j)&(i!=k)&(j!=k):
             #     cdf.append(pucN)
@@ -738,11 +764,248 @@ def puc_cal(data,i,genes,cdf,puc_genes):
             pickle.dump(cdf, f)
         with open('data/Pipeline_consolidate_220301/gcn/'+tiss+'_'+omic+'_puc_genes.pkl', 'wb') as f:
             pickle.dump(puc_genes, f)
-        # p = Path('data/Pipeline_consolidate_220301/gcn/'+tiss+'_'+omic+'_cdf.npy')
-        # with p.open('ab') as f:
-        #     np.save(f, cdf)
-        # p = Path('data/Pipeline_consolidate_220301/gcn/'+tiss+'_'+omic+'_puc_genes.npy')
-        # with p.open('ab') as f:
-        #     np.save(f, puc_genes)
         
         # return cdf, puc_genes
+        
+        
+
+
+def bipart(G,method,nodes):
+    return pd.DataFrame.from_dict(eval('bipartite.'+method)(G,nodes),orient='index',columns=[str(method)])
+
+def calc_bipart(Bgraphs,META,ii,i):
+# for ii,i in enumerate(relgene.columns[1:]):
+    # ccc=nx.convert_matrix.to_pandas_edgelist(graphs[i])
+    j=(i.split('-')[1])
+    i=(i.split('-')[0])
+    rrr=str(META[META['id']==i].index.item())+'_'+str(META[META['id']==i]['group'].item())+'_'+str(j)
+    # GG=rrr
+    G=Bgraphs[ii]
+    if not os.path.isfile('~/data/gcn/comp_net/'+rrr+'_post_nest_clust_BIP.txt'):
+
+        remove = [node for node,degree in dict(G.degree()).items() if degree < 3]
+        G.remove_nodes_from(remove)
+        top_nodes = {n for n, d in G.nodes(data=True) if d["bipartite"] == 0}
+        bottom_nodes = set(G) - top_nodes
+        try:
+            tC=bipart(G,'clustering',top_nodes)
+            tLC=bipart(G,'latapy_clustering',top_nodes)
+            tNR=bipart(G,'node_redundancy',top_nodes)
+            tDC=bipart(G,'degree_centrality',top_nodes)
+            tBC=bipart(G,'betweenness_centrality',top_nodes)
+            tCC=bipart(G,'closeness_centrality',top_nodes)
+            # tMEC=bipart(G,'min_edge_cover',top_nodes)
+            tSBP=bipart(G,'spectral_bipartivity',top_nodes)
+
+            bC=bipart(G,'clustering',bottom_nodes)
+            bLC=bipart(G,'latapy_clustering',bottom_nodes)
+            bNR=bipart(G,'node_redundancy',bottom_nodes)
+            bDC=bipart(G,'degree_centrality',bottom_nodes)
+            bBC=bipart(G,'betweenness_centrality',bottom_nodes)
+            bCC=bipart(G,'closeness_centrality',bottom_nodes)
+            # bMEC=bipart(G,'min_edge_cover',bottom_nodes)
+            bSBP=bipart(G,'spectral_bipartivity',bottom_nodes)
+
+
+            data_frames = [tC,tLC,tNR,tDC,tBC,tCC,tSBP,bC,bLC,bNR,bDC,bBC,bCC,bSBP]
+            df_merged = reduce(lambda  left,right: pd.merge(left,right,right_index=True,left_index=True,
+                                                how='outer'), data_frames)
+
+            df_merged.to_csv('~/data/gcn/comp_net/'+rrr+'_post_nest_clust_BIP2.txt',sep='\t',header=False)
+        except:
+            print([i,j,rrr])
+            
+def pdize_net(OTHER_00ST):
+    bb=pd.DataFrame(columns=['source','target'])
+    for i,ii in enumerate(OTHER_00ST):
+        cc=nx.to_pandas_edgelist(OTHER_00ST[i])
+        cc['weight']=1
+        bb=bb.merge(cc,how='outer',right_on=['source','target'],left_on=['source','target'])
+    bb.fillna(0)
+    aa=pd.DataFrame(bb.set_index(['source','target']).fillna(0).mean(axis=1))
+    cc=pd.DataFrame(bb.groupby('target').sum().mean(axis=1))
+    dd=pd.DataFrame(bb.groupby('source').sum().mean(axis=1))
+    return aa,cc,dd
+
+
+def plot_time_net(partitions,i,LL):
+    # if LL==0:
+    #     LL='OTHER'
+    # elif LL==1:
+    #     LL='CLA'
+    # elif LL==2:
+    #     LL='LEVO'
+    # i=str(i)
+    # Graph.layout_bipartite()
+    ig.plot(partitions[i].graph,"run/gcn/img/net/la_c"+str(i)+'_'+LL+"_net.png",layout="auto")
+
+    G0=partitions[i].graph.get_edge_dataframe().sort_values(by=['source','target'])
+    AA=G0.pivot('source',columns='target',values='weight').fillna(0)
+    plt.imshow(AA, cmap='hot', interpolation='nearest',aspect='auto')
+    plt.savefig("run/gcn/img/sq/la_c"+str(i)+'_'+LL+"_sq.png",dpi=300,bbox_inches = "tight")
+
+    # ig.plot(partitions[i].graph,'LEVO_la_c0.png')
+    partition = la.find_partition(eval('G_'+str(i)), la.ModularityVertexPartition)
+    eval('G_'+str(i)).vs['cluster'] = partition.membership
+    ig.plot(partition.graph,'run/gcn/img/out/la_c'+str(i)+'_'+LL+'_out.png',layout="auto")
+    
+    g = eval('G_'+str(i)).to_graph_tool()
+    state = gt.minimize_blockmodel_dl(g, state=gt.PPBlockState)
+    state.multiflip_mcmc_sweep(beta=np.inf, niter=100)
+    state.draw(output='run/gcn/img/gt/la_c'+str(i)+'_'+LL+'_GT.png')#pos=g.vp.pos)
+    state = gt.minimize_nested_blockmodel_dl(g)
+    state.draw(output='run/gcn/img/nest/la_c'+str(i)+'_'+LL+'_GT.png')
+    
+    tree = min_spanning_tree(g)
+    graph_draw(g, edge_color=tree,output="run/gcn/img/tree/min_tree"+str(i)+'_'+LL+".png")
+
+    g.set_edge_filter(tree)
+    graph_draw(g,output="run/gcn/img/tree/min_tree_filtered"+str(i)+'_'+LL+".png")
+    
+    bv, be = betweenness(g)
+    be.a /= be.a.max() / 5
+    graph_draw(g, vertex_fill_color=bv, edge_pen_width=be, output="run/gcn/img/bt_tree/filtered-bt"+str(i)+'_'+LL+".png")
+
+
+   
+    
+    
+# turn this into a function
+def igraph_from_pandas(edges_table, vertices_table, source_cl='from', target_cl='to', vertex_attrs=None, vertex_id_cl='v_id', directed=False):
+
+    import pandas as pd
+    import igraph as ig
+    # control parameters
+    if isinstance(edges_table, pd.DataFrame):
+        try:
+            if source_cl and target_cl in edges_table.columns:
+                id_gen = ig.UniqueIdGenerator()
+                edgelist = []
+                for start_edge, end_edge in edges_table[[source_cl, target_cl]].itertuples(index=False, name=None):
+                    edgelist.append((id_gen[start_edge], id_gen[end_edge]))
+                if directed:
+                    gg = ig.Graph(edgelist, directed=True)
+                else:
+                    gg = ig.Graph(edgelist, directed=False)
+                gg.vs["name"] = id_gen.values()
+        except (KeyError, NameError):
+            raise ValueError('Edges columns missing!')
+    else:
+        raise ValueError("edges table is required!")
+    if isinstance(vertices_table, pd.DataFrame):
+        if not vertex_attrs:
+            raise ValueError('No attributes provided. Remove vertices table from arguments and try again.')
+        else:
+            try:
+                # order vertices table based on edge_list
+                vertices_table_ordered = pd.DataFrame(id_gen.values(), columns=['unique_id'])
+                # bring previous vertices table with attributes (to be reordered)
+                vertices_table_ordered = vertices_table_ordered.merge(vertices_table, left_on = 'unique_id', right_on = vertex_id_cl, how='left')
+                for attr2use in vertex_attrs:
+                    if attr2use in vertices_table.columns:
+                        # add attributes to graph
+                        gg.vs[attr2use] = vertices_table_ordered[attr2use].values.tolist()
+            except (KeyError, NameError):
+                raise ValueError('Vertex ID column missing!')    
+    return gg
+
+def explode_graphs(relgene,META,B2graphs):
+    qqq=[]
+    for ii,i in enumerate(relgene.columns[1:-2]):
+        j=(i.split('-')[1])
+        i=(i.split('-')[0])
+        rrr=str(META[META['id']==i]['group'].item())+'_'+str(j)
+        rrr=rrr.replace("03ST", "02ST")
+        qqq.append(rrr)
+        B2graphs[ii].name=str(rrr)
+        # print(rrr,ii)
+
+        with open('data/gcn/'+rrr+'.pkl', 'wb') as f:
+                pickle.dump(B2graphs[ii], f)
+        # if
+    # zzz=[]
+    for i in np.unique(qqq):
+        zzz=[]
+        for j in B2graphs:
+            # print(i,j.name)
+            if j.name==i:
+
+                zzz.append(j)
+            with open('data/gcn/'+i+'.pkl', 'wb') as f:
+                pickle.dump(zzz, f)
+                
+                
+def plot_comm(CC,LL,OO,palette,j): ##time, community_type
+    
+    c=0
+    fig, ax = plt.subplots(ncols=3, nrows=3,figsize=(15,15))
+    # dict_keys = [k for k in z.keys()]
+    for k in [CC,LL,OO]:
+        web=(k)
+        # k=eval(k)
+        for i in k.columns[2:]:
+            
+            jj0=pd.DataFrame(k[['source','target',i]])#.reset_index()
+            jj0.columns=['start','end','value']
+            jj0=jj0[jj0['value']>0]
+            kk=pd.DataFrame(np.unique(jj0[['start','end']].melt()['value']))
+            kk.columns=['name']
+            kk['id']=kk['name']
+            kk['types']=np.concatenate([np.ones(len(np.unique(jj0.end))),np.zeros(len(np.unique(jj0.start)))]).astype('int')
+            G_00=igraph_from_pandas(edges_table=jj0, vertices_table=kk, source_cl='start', target_cl='end', vertex_attrs=list(kk.columns), vertex_id_cl='name', directed=False)
+
+            G_00.vs['pagerank']=G_00.pagerank()
+            G_00.vs['cluster'] = G_00.community_infomap().membership
+                # N,Q,I,R=Parallel(n_jobs=10)(structural_analysis(ii,i,graphs,ARG_meta,rand=rand,deg_rand=deg_rand))
+
+            # for j in [edge_betweenness,fastgreedy,infomap,label_propagation,leading_eigenvector,leiden,multilevel,_optimal_modularity,spinglass,walktrap]:
+            # G_00.vs['louvain_membership']=G_00.community_multilevel().membership
+            try:
+                Path("run/gcn/img/"+j).mkdir(parents=True, exist_ok=True)
+                G_00.vs[j+'membership']=eval('G_00.community_'+j)().membership
+            except:
+                G_00.vs[j+'membership']=eval('G_00.community_'+j)()
+            g00e=G_00.get_edge_dataframe()#.reset_index()
+            g00v=G_00.get_vertex_dataframe().reset_index()
+            g00e['weight']=jj0['value']
+            jj=g00e.merge(g00v,left_on='source',right_on='vertex ID').merge(g00v,left_on='target',right_on='vertex ID')
+            jj.name_x, jj.name_y = np.where(jj.name_x.str.contains('UniRef'), [jj.name_y, jj.name_x], [jj.name_x, jj.name_y])
+            # for j in ['louvain_','leiden_']:
+            gg=jj.groupby(['name_x',j+'membership_x']).count().sort_values(['target',j+'membership_x'])
+            gg=gg.reset_index()[['name_x',j+'membership_x','target']]
+            # hh=hh.merge(gg,how='outer')
+            
+            # gg[j+'membership_x']=gg[j+'membership_x'].astype('category')
+            sns.histplot(gg, x=gg[j+'membership_x'].astype('int')+1, hue='name_x',log_scale=[False,True],weights='target',multiple='stack',shrink=0.8,palette=palette,ax=ax.flat[c],legend=False).set_title(web+"_"+i)
+            
+            c=c+1
+    # plt.figure(figsize=(10,6))
+    
+            # plt.set(xlabel=i+' '+j+' membership',yscale='log',ylabel='link count')
+    # g.set_title(str(C)+'_'+i+'_'+j)
+    # g.set_xlabel(i+' '+j+' membership')
+            # g.set_yscale('log')
+    plt.savefig('run/gcn/img/'+j+'.png', dpi=100)
+    
+    
+
+def card_net(OTHER_00ST,uni_conv,card):
+    bb=pd.DataFrame(columns=['source','target'])
+    for i,ii in enumerate(OTHER_00ST):
+        cc=nx.to_pandas_edgelist(OTHER_00ST[i])
+        cc['weight']=1
+        bb=bb.merge(cc,how='outer',right_on=['source','target'],left_on=['source','target'])
+    bb.fillna(0)
+    # aa=pd.DataFrame(bb.set_index(['source','target']).fillna(0).mean(axis=1))
+    # ee=aa
+    bb.reset_index(inplace=True)
+    cc=bb.loc[:,bb.columns.str.contains('weight')]
+    cc=1-(np.sum(cc,axis=0)/len(cc))
+    
+    bb['target']=bb['target'].str.split('_').str[1]#.to_csv('CLA_uniref.txt',sep='\t')
+    bb=bb.merge(uni_conv,left_on='target',right_on='Entry')
+    bb=bb.merge(card,on='Entry name')#[['source','target',0]]
+    bb.fillna(0,inplace=True)
+    bb=bb.loc[:,bb.columns.str.contains('weight')]
+    dd=1-(np.sum(bb,axis=0)/len(bb))
+    return bb,cc,dd
